@@ -2,7 +2,7 @@
 ## Fall 2018
 ## Project 1: What made you happy today?
 
-![image](figs/title.jpeg)
+![image](figs/p4.png)
 
 ### [Project Description](doc/)
 
