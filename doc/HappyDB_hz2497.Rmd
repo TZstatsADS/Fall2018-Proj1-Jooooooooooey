@@ -1,19 +1,188 @@
 ---
 title: "HappyDB_Huiyu_Zhang"
-output: html_notebook
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+#Topic: How people from different age groups differ in describing their happy moments
 
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
-
-```{r}
-#Just say hi
+###First, load necessary packages
+```{r loading library,warning=FALSE,message=FALSE}
+library(tm)
+library(tidyverse)
+library(tidytext)
+library(ngram)
+library(plyr)
+library(dplyr)
+library(data.table)
+library(tidytext)
+library(ggplot2)
+library(ggcorrplot)
+library(base)
+library(DataCombine)
+library(colorspace)
+library(magrittr)
+library(multipanelfigure)
 ```
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+###Dataset Loading
+```{r load data, warning=FALSE, message=FALSE}
+hm<-read_csv("../output/processed_moments.csv")
+url<-'https://raw.githubusercontent.com/rit-public/HappyDB/master/happydb/data/demographic.csv'
+demo<-read_csv(url)
+```
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+###Data Combing and data cleaning
+```{r combining data, warning=FALSE, message=FALSE}
+# Combine dataset hm and dataset demo by their common wid
+hm<- inner_join(hm,demo,by="wid")
+hm<- select(hm,wid,original_hm,gender,marital,parenthood,reflection_period,age,country,predicted_category,text)
+# Transfer the age from a string to a numeric number
+hm$age<-as.numeric(hm$age)   
+# Add a column calculating the number of words
+hm<- mutate(hm,count=sapply(hm$original_hm, wordcount)) 
+# Filer out dirty data
+hm<- filter(hm, gender %in% c("m","f")) 
+hm<- filter(hm, marital %in% c("single","married"))
+hm<- filter(hm, parenthood %in% c("n","y"))
+hm<- filter(hm, reflection_period %in% c("24h","3m"))
+```
 
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+##Explore basic information about different age groups
+```{r}
+table(hm$age) 
+# Since there is only few people older than 90, which is not very useful for analysis. I am gonna filter them out
+hm<- filter(hm,age<90) 
+# Take a look on distribution of ages
+hist(hm$age) 
+# Break them into 9 age groups
+agebreaks<- c(0,10,20,30,40,50,60,70,80,90)
+agelabels<- c("0-9","10-19","20-29","30-39","40-49","50-59","60-69","70-79","80-89")
+setDT(hm)[,agegroups:=cut(age,breaks=agebreaks,right=FALSE,labels=agelabels)]
+# Take a look on the distribution of agegroups
+table(hm$agegroups)
+# Explore the basic relationship between agegroups and other variables
+table(hm$gender,hm$agegroups)
+table(hm$country,hm$agegroups)
+# Distribution of length of words in different agegroups.
+plot(hm$count~hm$agegroups,type="p",lwd=0.5)
+```
+
+It is very interesting to see how does people from different agegroups differ in length of happy momemnt description, and to see the distribution of their genders and countries
+
+
+##Create bag of words
+```{r bag of words, warning=FALSE, message=FALSE}
+bow<- unnest_tokens(hm,word,text)
+word_count<- dplyr::count(bow,word,sort=TRUE)
+```
+
+
+##Relationship between agegroups and predicted_category
+Let's find out how people from different age groups differ in the predicted category of their happy moments
+```{r}
+# Count predicted categories for every agegroup
+category_agegroups<- ddply(hm,.(hm$predicted_category,hm$agegroups),nrow)
+names(category_agegroups)<- c("predicted_category","agegroups","counts")
+# Insert a new row where 0-9 age groups didn't mention exercise at all
+category_agegroups<- InsertRow(category_agegroups,c("exercise","0-9",0),37) 
+category_agegroups$counts<- as.numeric(category_agegroups$counts)
+data<- matrix(category_agegroups$counts,nrow=7,byrow = T)
+rownames(data)<- c("achievement","affection","bonding","enjoy_the_moment","exercise","leisure","nature")
+colnames(data)<- c("0-9","10-19","20-29","30-39","40-49","50-59","60-69","70-79","80-89")
+#count(hm,vars=c("predicted_category","agegroups"))
+theme_set(theme_classic())
+barplot(data,col=rainbow_hcl(7),legend=rownames(data),space = 0.005,font.axis=2)
+data_percentage<- apply(data,2,function(x){x/sum(x)})
+barplot(data_percentage,col=rainbow_hcl(7),border="white",legend.text=rownames(data),space = 0.005,font.axis=2,args.legend = list(x="right",bty="n",inset=c(0.05,0),xpd=T))
+```
+
+Looking at the first plot, we are able to see what kind of happy moments are people from different agegroups mainly taking about. But since there's large difference of population between groups, it is hard to tell how the percentage of category differs between agegroups. That's the reason why I created the second plot. According to the second plot, it's much more easier to find out the category percentage difference between agegroups.  
+  
+##Find top 10 popular happy words in every agegroup
+```{r}
+bow<- unnest_tokens(hm,word,text)
+bow_0<- bow[bow$agegroups=="0-9",]
+bow_10<-bow[bow$agegroups=="10-19",]
+bow_20<-bow[bow$agegroups=="20-29",]
+bow_30<-bow[bow$agegroups=="30-39",]
+bow_40<-bow[bow$agegroups=="40-49",]
+bow_50<-bow[bow$agegroups=="50-59",]
+bow_60<-bow[bow$agegroups=="60-69",]
+bow_70<-bow[bow$agegroups=="70-79",]
+bow_80<-bow[bow$agegroups=="80-89",]
+word_count<- filter(dplyr::count(bow,word,sort=TRUE),n!=1)
+word_count0<- filter(dplyr::count(bow_0,word,sort=TRUE),n!=1)[1:10,]
+word_count10<- filter(dplyr::count(bow_10,word,sort=TRUE),n!=1)[1:10,]
+word_count20<- filter(dplyr::count(bow_20,word,sort=TRUE),n!=1)[1:10,]
+word_count30<- filter(dplyr::count(bow_30,word,sort=TRUE),n!=1)[1:10,]
+word_count40<- filter(dplyr::count(bow_40,word,sort=TRUE),n!=1)[1:10,]
+word_count50<- filter(dplyr::count(bow_50,word,sort=TRUE),n!=1)[1:10,]
+word_count60<- filter(dplyr::count(bow_60,word,sort=TRUE),n!=1)[1:10,]
+word_count70<- filter(dplyr::count(bow_70,word,sort=TRUE),n!=1)[1:10,]
+word_count80<- filter(dplyr::count(bow_80,word,sort=TRUE),n!=1)[1:10,]
+p1<- word_count0 %>%
+  mutate(word=fct_reorder(word,n)) %>%
+  ggplot(aes(x=word,y=n))+geom_bar(stat = "identity")+coord_flip()+labs(title="Top 10 happy words for Agegroup 0-9")+
+  theme(text = element_text(size=5))
+p2<- word_count10 %>%
+  mutate(word=fct_reorder(word,n)) %>%
+  ggplot(aes(x=word,y=n))+geom_bar(stat = "identity")+coord_flip()+labs(title="Top 10 happy words for Agegroup 10-19")+
+  theme(text = element_text(size=5))
+p3<- word_count20 %>%
+  mutate(word=fct_reorder(word,n)) %>%
+  ggplot(aes(x=word,y=n))+geom_bar(stat = "identity")+coord_flip()+labs(subtitle="Top 10 happy words for Agegroup 20-29")+
+  theme(text = element_text(size=5))
+p4<- word_count30 %>%
+  mutate(word=fct_reorder(word,n)) %>%
+  ggplot(aes(x=word,y=n))+geom_bar(stat = "identity")+coord_flip()+labs(subtitle="Top 10 happy words for Agegroup 30-39")+
+  theme(text = element_text(size=5))
+p5<- word_count40 %>%
+  mutate(word=fct_reorder(word,n)) %>%
+  ggplot(aes(x=word,y=n))+geom_bar(stat = "identity")+coord_flip()+labs(subtitle="Top 10 happy words for Agegroup 40-49")+
+  theme(text = element_text(size=5))
+p6<- word_count50 %>%
+  mutate(word=fct_reorder(word,n)) %>%
+  ggplot(aes(x=word,y=n))+geom_bar(stat = "identity")+coord_flip()+labs(title="Top 10 happy words for Agegroup 50-59")+
+  theme(text = element_text(size=5))
+p7<- word_count60 %>%
+  mutate(word=fct_reorder(word,n)) %>%
+  ggplot(aes(x=word,y=n))+geom_bar(stat = "identity")+coord_flip()+labs(title="Top 10 happy words for Agegroup 60-69")+
+  theme(text = element_text(size=5))
+p8<- word_count70 %>%
+  mutate(word=fct_reorder(word,n)) %>%
+  ggplot(aes(x=word,y=n))+geom_bar(stat = "identity")+coord_flip()+labs(title="Top 10 happy words for Agegroup 70-79")+
+  theme(text = element_text(size=5))
+p9<- word_count80 %>%
+  mutate(word=fct_reorder(word,n)) %>%
+  ggplot(aes(x=word,y=n))+geom_bar(stat = "identity")+coord_flip()+labs(title="Top 10 happy words for Agegroup 80-89")+
+  theme(text = element_text(size=5))
+figure<- multi_panel_figure(columns = 3,rows = 3,panel_label_type = "none")
+figure %>%
+  fill_panel(p1,column = 1,row = 1) %>%
+  fill_panel(p2,column = 2,row = 1) %>%
+  fill_panel(p3,column = 3,row = 1) %>%
+  fill_panel(p4,column = 1,row = 2) %>%
+  fill_panel(p5,column = 2,row = 2) %>%
+  fill_panel(p6,column = 3,row = 2) %>%
+  fill_panel(p7,column = 1,row = 3) %>%
+  fill_panel(p8,column = 2,row = 3) %>%
+  fill_panel(p9,column = 3,row = 3)
+```
+Here are the top 10 happy words for differnt agegroups.
+
+##Create Comparison Word Cloud
+```{r,message=FALSE,warning=FALSE}
+#since the comparison word cloud only allows 8 groups for campare, I deleted the Agegroup 0-9
+corpus<- c(paste(bow[bow$agegroups=="10-19",]$word,collapse=" "),paste(bow[bow$agegroups=="20-29",]$word,collapse=" "),paste(bow[bow$agegroups=="30-39",]$word,collapse=" "),paste(bow[bow$agegroups=="40-49",]$word,collapse=" "),paste(bow[bow$agegroups=="50-59",]$word,collapse=" "),paste(bow[bow$agegroups=="60-69",]$word,collapse=" "),paste(bow[bow$agegroups=="70-79",]$word,collapse=" "),paste(bow[bow$agegroups=="80-89",]$word,collapse=" "))
+co<- Corpus(VectorSource(corpus))
+tdm<- TermDocumentMatrix(co)
+m<- as.matrix(tdm)
+colnames(m)<- c("Agegroup10-19","Agegroup20-29","Agegroup30-39","Agegroup40-49","Agegroup50-59","Agegroup60-69","Agegroup70-79","Agegroup80-89")
+wordcloud::comparison.cloud(m,title.size = 1,match.colors = T)
+```
+
+This comparison word cloud shows the most common happy words among various agegroups. We can clearly see that some of agegroups share the same happy words but also differs in other happy words.
+
 
