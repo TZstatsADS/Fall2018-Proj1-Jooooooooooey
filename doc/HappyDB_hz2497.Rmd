@@ -71,7 +71,7 @@ table(hm$country,hm$agegroups)
 plot(hm$count~hm$agegroups,type="p",lwd=0.5)
 ```
 
-It is very interesting to see how does people from different agegroups differ in length of happy momemnt description, and to see the distribution of their genders and countries
+It is very interesting to see how do people from different agegroups differ in length of happy momemnt description. According to the plot above, the agegroup 20-29 took the longest sentence to describe their happy moments, but a part of reasons might also comes from that their population in this survey are the biggest. So it is hard to say if this age group tend to use more words on describing their happy moments compared with other age groups.
 
 
 ##Create bag of words
@@ -172,6 +172,7 @@ figure %>%
   fill_panel(p8,column = 2,row = 3) %>%
   fill_panel(p9,column = 3,row = 3)
 ```
+
 Here are the top 10 happy words for differnt agegroups.
 
 ##Create Comparison Word Cloud
@@ -185,6 +186,5 @@ colnames(m)<- c("Agegroup10-19","Agegroup20-29","Agegroup30-39","Agegroup40-49",
 wordcloud::comparison.cloud(m,title.size = 1,match.colors = T)
 ```
 
-This comparison word cloud shows the most common happy words among various agegroups. We can clearly see that some of agegroups share the same happy words but also differs in other happy words.
-
+This comparison word cloud shows the most common happy words among various agegroups. We can clearly see that some of agegroups share the same happy words but also differs in other happy words. As we can see, the word "friend" and "game" are frequently mentioned among the young generation(10-30), which totally make sense. And for middle age people(30-60), they focused more on their kids, such as "daugher","son" and "kids". However, for people who are elder than 60, they paid more attention on their spouses as we can see the word "wife" and "husband" took a large part on their happy moments description.
 
