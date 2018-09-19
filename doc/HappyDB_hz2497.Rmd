@@ -186,5 +186,5 @@ colnames(m)<- c("Agegroup10-19","Agegroup20-29","Agegroup30-39","Agegroup40-49",
 wordcloud::comparison.cloud(m,title.size = 1,match.colors = T)
 ```
 
-This comparison word cloud shows the most common happy words among various agegroups. We can clearly see that some of agegroups share the same happy words but also differs in other happy words. As we can see, the word "friend" and "game" are frequently mentioned among the young generation(10-30), which totally make sense. And for middle age people(30-60), they focused more on their kids, such as "daugher","son" and "kids". However, for people who are elder than 60, they paid more attention on their spouses as we can see the word "wife" and "husband" took a large part on their happy moments description.
+This comparison word cloud shows the most distinct but frequent happy words among various agegroups. As we can see, the word "friend" and "game" are frequently mentioned among the young generation(10-30), which totally make sense. And for middle age people(30-60), they focused more on their kids, such as "daugher","son" and "kids". However, for people who are elder than 60, they paid more attention on their spouses as we can see the word "wife" and "husband" took a large part on their happy moments description.
 
